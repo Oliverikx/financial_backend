@@ -33,7 +33,7 @@ public class Card implements Serializable {
     @ManyToOne(optional = false)
     @NotNull
     @JoinColumn(name = "account_id")
-    private Account bank;
+    private Account account;
 
     @Column(name = "balance_available")
     private Float balanceAvailable;
@@ -78,12 +78,12 @@ public class Card implements Serializable {
         this.activated = activated;
     }
 
-    public Account getBank() {
-        return bank;
+    public Account getAccount() {
+        return account;
     }
 
-    public void setBank(Account bank) {
-        this.bank = bank;
+    public void setAccount(Account account) {
+        this.account = account;
     }
 
     public Float getBalanceAvailable() {
@@ -96,7 +96,7 @@ public class Card implements Serializable {
 
     @Override
     public String toString() {
-        return "Card [activated=" + activated + ", balanceAvailable=" + balanceAvailable + ", bank=" + bank + ", id="
+        return "Card [activated=" + activated + ", balanceAvailable=" + balanceAvailable + ", account=" + account + ", id="
                 + id + ", number=" + number + ", pin=" + pin + ", type=" + type + "]";
     }
 

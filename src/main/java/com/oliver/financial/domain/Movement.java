@@ -28,7 +28,7 @@ public class Movement implements Serializable{
     @ManyToOne(optional = false)
     @NotNull
     @JoinColumn(name = "account_id")
-    private Account bank;
+    private Account account;
 
     public Long getId() {
         return id;
@@ -54,17 +54,17 @@ public class Movement implements Serializable{
         this.type = type;
     }
 
-    public Account getBank() {
-        return bank;
+    public Account getAccount() {
+        return account;
     }
 
-    public void setBank(Account bank) {
-        this.bank = bank;
+    public void setAccount(Account account) {
+        this.account = account;
     }
 
     @Override
     public String toString() {
-        return "Movement [amount=" + amount + ", bank=" + bank + ", id=" + id + ", type=" + type + "]";
+        return "Movement [amount=" + amount + ", account=" + account + ", id=" + id + ", type=" + type + "]";
     }
 
     
