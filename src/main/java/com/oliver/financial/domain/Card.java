@@ -35,7 +35,7 @@ public class Card implements Serializable {
     @JoinColumn(name = "account_id")
     private Account bank;
 
-    @Column(name = "balance_available", nullable = false)
+    @Column(name = "balance_available")
     private Float balanceAvailable;
 
     public Long getId() {
