@@ -5,8 +5,12 @@ import java.util.Optional;
 import java.security.Principal;
 import javax.validation.Valid;
 
+import com.oliver.financial.domain.Account;
 import com.oliver.financial.domain.Card;
 import com.oliver.financial.domain.Movement;
+import com.oliver.financial.domain.enumeration.CardType;
+import com.oliver.financial.domain.enumeration.MovementType;
+import com.oliver.financial.service.AccountService;
 import com.oliver.financial.service.CardService;
 import com.oliver.financial.service.MovementService;
 import com.oliver.financial.service.dto.*;
@@ -26,41 +30,51 @@ public class MovementController {
 
     private final CardService cardService;
 
-    public MovementController(MovementService movementService, CardService cardService) {
+    private final AccountService accountService;
+
+    public MovementController(MovementService movementService, CardService cardService, AccountService accountService) {
         this.movementService = movementService;
         this.cardService = cardService;
+        this.accountService = accountService;
     }
 
     @GetMapping("/movements")
     public ResponseEntity<List<Movement>> allMovements(Principal principal) {
         log.debug("Request to get all movements of: {}", principal.getName());
         Optional<Card> card = cardService.findOneByNumber(Integer.parseInt(principal.getName()));
-        if (!card.isPresent()) {
-            throw new ResponseStatusException(HttpStatus.NOT_FOUND, "Invalid card number");
-        }
-        if (!card.get().isActivated() || card.get().getPin() == null) {
-            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "The card is not available");
-        }
         List<Movement> movements = movementService.findAllByAccount_Id(card.get().getAccount().getId());
         return ResponseEntity.ok().body(movements);
     }
 
-    /* @PostMapping("/movements/cash/deposite")
-    public ResponseEntity<Movement> depositeCash(@RequestBody @Valid MovementDTO movementDTO) {
-        log.debug("Request to deposite cash: {}", movementDTO);
-        Optional<Card> card = cardService.findOneByNumber(movementDTO.getCardNumber());
-        if (!card.isPresent()) {
-            throw new ResponseStatusException(HttpStatus.NOT_FOUND, "Invalid card number");
+    @PostMapping("/movements")
+    public ResponseEntity<Movement> createMovement(@RequestBody @Valid MovementDTO movementDTO, Principal principal) {
+        log.debug("Request to create movement: {}", movementDTO);
+        Optional<Card> card = cardService.findOneByNumber(Integer.parseInt(principal.getName()));
+        if (movementDTO.getType().equals(MovementType.TRANSFER_OUTGONE)) {
+            if (movementDTO.getIban() == null || movementDTO.getIban().isEmpty()) {
+                throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "The IBAN is mandatory");
+            }
+            Optional<Account> account = accountService.findOneByIban(movementDTO.getIban());
+            if (!account.isPresent()) {
+                throw new ResponseStatusException(HttpStatus.NOT_FOUND, "Invalid iban");
+            }
+
         }
-        if (!card.get().isActivated() || card.get().getPin() == null) {
-            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "The card is not available");
+        if (movementDTO.getType().equals(MovementType.CASH_DEPOSITED) && ((card.get().getType().equals(CardType.DEBIT)
+                && movementDTO.getAmount() > card.get().getAccount().getBalance())
+                || (card.get().getType().equals(CardType.CREDIT) && movementDTO
+                        .getAmount() > (card.get().getBalanceAvailable() != null ? card.get().getBalanceAvailable()
+                                : 0.0f)))) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Insufficient balance");
         }
-        if (!cardService.checkCardPin(movementDTO.getPin(), card.get().getPin())) {
-            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Invalid pin");
+        Movement result = movementService.save(movementDTO, card.get());
+        if (card.get().getType().equals(CardType.DEBIT)) {
+            Account accountUpdated = accountService.updateAccount(result, result.getAccount());
+            result.setAccount(accountUpdated);
+        } else {
+            cardService.updateCard(result, card.get());
         }
-        card.get().setActivated(true);
-        List<Movement> movements = movementService.findAllByAccount_Id(accountId);
-        return ResponseEntity.ok().body(movements);
-    } */
+        return ResponseEntity.ok().body(result);
+    }
 
 }
