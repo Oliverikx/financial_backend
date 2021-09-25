@@ -5,11 +5,16 @@ import java.util.Optional;
 import javax.validation.Valid;
 
 import com.oliver.financial.domain.Card;
+import com.oliver.financial.security.*;
 import com.oliver.financial.service.CardService;
 import com.oliver.financial.service.dto.*;
 
 import org.slf4j.*;
 import org.springframework.http.*;
+import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
+import org.springframework.security.config.annotation.authentication.builders.AuthenticationManagerBuilder;
+import org.springframework.security.core.*;
+import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.server.ResponseStatusException;
 
@@ -21,12 +26,18 @@ public class CardController {
 
     private final CardService cardService;
 
-    public CardController(CardService cardService) {
+    private final AuthenticationManagerBuilder authenticationManagerBuilder;
+
+    private final TokenProvider tokenProvider;
+
+    public CardController(CardService cardService, TokenProvider tokenProvider, AuthenticationManagerBuilder authenticationManagerBuilder) {
         this.cardService = cardService;
+        this.tokenProvider = tokenProvider;
+        this.authenticationManagerBuilder = authenticationManagerBuilder;
     }
 
-    @PostMapping("/card/activate")
-    public ResponseEntity<Card> registerAccount(@RequestBody @Valid CardNumberDTO cardNumberDTO) {
+    @PostMapping("/cards/activate")
+    public ResponseEntity<Card> activateCard(@RequestBody @Valid CardNumberDTO cardNumberDTO) {
         log.debug("Request to activate card: {}", cardNumberDTO);
         Optional<Card> card = cardService.findOneByNumber(cardNumberDTO.getCardNumber());
         if (!card.isPresent()) {
@@ -40,7 +51,7 @@ public class CardController {
         return ResponseEntity.ok().body(result);
     }
 
-    @PutMapping("/card/pin")
+    @PutMapping("/cards/pin")
     public ResponseEntity<Card> changePin(@RequestBody @Valid ChangePinCardDTO changePinCardDTO) {
         log.debug("Request to change pin card: {}", changePinCardDTO);
         Optional<Card> card = cardService.findOneByNumber(changePinCardDTO.getCardNumber());
@@ -54,5 +65,20 @@ public class CardController {
         }
         Card result = cardService.changePin(card.get(), changePinCardDTO.getNewPin());
         return ResponseEntity.ok().body(result);
+    }
+
+    @PostMapping("/cards/access")
+    public ResponseEntity<JWTToken> authorize(@Valid @RequestBody CardDTO cardDTO) {
+
+        UsernamePasswordAuthenticationToken authenticationToken = new UsernamePasswordAuthenticationToken(
+            cardDTO.getCardNumber(), cardDTO.getPin());
+
+        Authentication authentication = authenticationManagerBuilder.getObject().authenticate(authenticationToken);
+        SecurityContextHolder.getContext().setAuthentication(authentication);
+
+        String jwt = tokenProvider.createToken(authentication);
+        HttpHeaders httpHeaders = new HttpHeaders();
+        httpHeaders.add(JWTFilter.AUTHORIZATION_HEADER, "Bearer " + jwt);
+        return new ResponseEntity<>(new JWTToken(jwt), httpHeaders, HttpStatus.OK);
     }
 }
